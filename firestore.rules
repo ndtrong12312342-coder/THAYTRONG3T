@@ -1,0 +1,131 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} { allow read, write: if false; }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isTeacher() {
+      return isAuthenticated() && getUserData().role == 'teacher';
+    }
+
+    function isStudent() {
+      return isAuthenticated() && getUserData().role == 'student';
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() < 100 &&
+             data.role in ['teacher', 'student'] &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (!('className' in data) || (data.className is string && data.className.size() < 100)) &&
+             (!('password' in data) || (data.password is string && data.password.size() < 100)) &&
+             (!('facebook' in data) || (data.facebook is string && data.facebook.size() < 200)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 20)) &&
+             data.createdAt is string; // using ISO string from js
+    }
+
+    function isValidExam(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.teacherId is string && data.teacherId.size() > 0 && data.teacherId.size() < 100 &&
+             data.duration is number && data.duration > 0 && data.duration <= 300 &&
+             data.status in ['draft', 'published', 'completed'] &&
+             data.assignedClasses is list && data.assignedClasses.size() <= 60 &&
+             data.questions is list && data.questions.size() <= 120 &&
+             (!('submissionSummary' in data) || data.submissionSummary is list) &&
+             (!('startTime' in data) || data.startTime is string) &&
+             (!('endTime' in data) || data.endTime is string) &&
+             data.createdAt is string;
+    }
+
+    function isValidSubmission(data) {
+      return data.examId is string && data.examId.size() > 0 && data.examId.size() < 100 &&
+             data.studentId is string && data.studentId.size() > 0 && data.studentId.size() < 100 &&
+             data.answers is string && data.answers.size() < 20000 &&
+             (!('essayImages' in data) || (data.essayImages is string && data.essayImages.size() < 10 * 1024 * 1024)) &&
+             data.score is number && data.score >= 0 && data.score <= 100 &&
+             (!('status' in data) || data.status in ['submitted', 'graded']) &&
+             data.incorrectQuestions is list && data.incorrectQuestions.size() <= 120 &&
+             data.submittedAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      // PII Blanket Guard: Restrict reads to owner or teachers.
+      // Additionally, allow anyone authenticated to list if they are checking for teacher role, or reading their own role.
+      allow get: if isOwner(userId) || isTeacher();
+      
+      // Allow teacher queries, or any user check if a teacher exists (needed during Google login creation).
+      // NOTE: list does not have access to resource.data securely in all SDK implementations, but this checks document contents.
+      // Actually, the teacher checks `role == 'student'`. Students shouldn't list users.
+      allow list: if isTeacher() || (isAuthenticated() && resource.data.role == 'teacher');
+      
+      // A user can create their own profile. A teacher can create student profiles.
+      allow create: if isAuthenticated() && isValidUser(incoming()) && 
+                    (isOwner(userId) || isTeacher()) &&
+                    incoming().uid == userId;
+                    
+      // A user can update their own profile. A teacher can update student profiles.
+      allow update: if isAuthenticated() && isValidUser(incoming()) && 
+                    (isOwner(userId) || isTeacher()) &&
+                    incoming().uid == existing().uid &&
+                    incoming().createdAt == existing().createdAt;
+                    
+      allow delete: if isTeacher();
+    }
+
+    match /exams/{examId} {
+      // Teachers can read all exams. Students can read published exams.
+      allow read: if isAuthenticated() && (isTeacher() || (isStudent() && resource.data.status == 'published'));
+      
+      // Only teachers can create/update/delete exams
+      allow create: if isTeacher() && isValidExam(incoming()) && incoming().teacherId == request.auth.uid;
+      
+      allow update: if isAuthenticated() && 
+                    ((isTeacher() && isValidExam(incoming()) && existing().teacherId == request.auth.uid && incoming().teacherId == existing().teacherId && incoming().createdAt == existing().createdAt) ||
+                    (isStudent() && isValidExam(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['submissionSummary'])));
+                    
+      allow delete: if isTeacher() && existing().teacherId == request.auth.uid;
+    }
+
+    match /submissions/{submissionId} {
+      // Teachers can read all submissions. Students can read their own submissions.
+      allow read: if isAuthenticated() && (isTeacher() || (isStudent() && resource.data.studentId == request.auth.uid));
+      
+      // Students can create submissions for themselves
+      allow create: if isStudent() && isValidSubmission(incoming()) && incoming().studentId == request.auth.uid;
+      
+      // Teachers can update submissions (for recalculating scores)
+      allow update: if isTeacher() && isValidSubmission(incoming()) && incoming().studentId == existing().studentId && incoming().examId == existing().examId;
+      
+      allow delete: if isTeacher();
+    }
+  }
+}
