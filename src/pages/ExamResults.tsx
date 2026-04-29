@@ -507,7 +507,7 @@ export default function ExamResults() {
                       {student && student.phone && (
                         <button
                           onClick={() => {
-                            const text = `🎉 KẾT QUẢ BÀI THI 🎉\n\nChào ${student.name}, em đã hoàn thành bài thi: "${exam.title}"\n\n🎯 Điểm số: ${sub.score.toFixed(2)} / 10 điểm.\n👉 Hãy tiếp tục cố gắng nhé!\n🔗 Xem lại bài làm: https://thay-trong.vercel.app`;
+                            const text = `🎉 KẾT QUẢ BÀI THI 🎉\n\nChào ${student.name}, em đã hoàn thành bài thi: "${exam.title}"\n\n🎯 Điểm số: ${sub.score.toFixed(2)} / 10 điểm.\n👉 Hãy tiếp tục cố gắng nhé!\n🔗 Xem lại bài làm: https://thaytrong-3-t.vercel.app/`;
                             navigator.clipboard.writeText(text);
                             alert('Đã copy thông báo điểm vào khay nhớ tạm. Dán (Ctrl+V) vào Zalo của học sinh để gửi!');
                             window.open(`https://chat.zalo.me/?phone=${student.phone.replace(/[^0-9]/g, '')}`, '_blank');
@@ -522,7 +522,7 @@ export default function ExamResults() {
                       {student && student.facebook && (
                         <button
                           onClick={() => {
-                            const text = `🎉 KẾT QUẢ BÀI THI 🎉\n\nChào ${student.name}, em đã hoàn thành bài thi: "${exam.title}"\n\n🎯 Điểm số: ${sub.score.toFixed(2)} / 10 điểm.\n👉 Hãy tiếp tục cố gắng nhé!\n🔗 Xem lại bài làm: https://thay-trong.vercel.app`;
+                            const text = `🎉 KẾT QUẢ BÀI THI 🎉\n\nChào ${student.name}, em đã hoàn thành bài thi: "${exam.title}"\n\n🎯 Điểm số: ${sub.score.toFixed(2)} / 10 điểm.\n👉 Hãy tiếp tục cố gắng nhé!\n🔗 Xem lại bài làm: https://thaytrong-3-t.vercel.app/`;
                             navigator.clipboard.writeText(text);
                             alert('Đã copy thông báo điểm vào khay nhớ tạm. Dán (Ctrl+V) vào Facebook của học sinh để gửi!');
                             window.open(student.facebook, '_blank');

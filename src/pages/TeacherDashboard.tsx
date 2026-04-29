@@ -672,7 +672,7 @@ export default function TeacherDashboard() {
                           <>
                             <button
                               onClick={() => {
-                                const text = `📢 THÔNG BÁO BÀI TẬP MỚI 📢\n\n📌 Bài tập: ${exam.title}\n👥 Dành cho lớp: ${exam.assignedClasses?.join(', ') || 'Tất cả'}\n⏱️ Thời gian làm bài: ${exam.duration} phút\n\n👉 Các em vào link sau để làm bài nhé:\n🔗 Liên kết: https://thay-trong.vercel.app`;
+                                const text = `📢 THÔNG BÁO BÀI TẬP MỚI 📢\n\n📌 Bài tập: ${exam.title}\n👥 Dành cho lớp: ${exam.assignedClasses?.join(', ') || 'Tất cả'}\n⏱️ Thời gian làm bài: ${exam.duration} phút\n\n👉 Các em vào link sau để làm bài nhé:\n🔗 Liên kết: https://thaytrong-3-t.vercel.app/`;
                                 navigator.clipboard.writeText(text);
                                 alert('Đã copy thông báo vào khay nhớ tạm. Dán (Ctrl+V) vào nhóm Zalo để gửi cho học sinh!');
                                 window.open('https://chat.zalo.me/', '_blank');
@@ -685,7 +685,7 @@ export default function TeacherDashboard() {
                             </button>
                             <button
                               onClick={() => {
-                                const text = `📢 THÔNG BÁO BÀI TẬP MỚI 📢\n\n📌 Bài tập: ${exam.title}\n👥 Dành cho lớp: ${exam.assignedClasses?.join(', ') || 'Tất cả'}\n⏱️ Thời gian làm bài: ${exam.duration} phút\n\n👉 Các em vào link sau để làm bài nhé:\n🔗 Liên kết: https://thay-trong.vercel.app`;
+                                const text = `📢 THÔNG BÁO BÀI TẬP MỚI 📢\n\n📌 Bài tập: ${exam.title}\n👥 Dành cho lớp: ${exam.assignedClasses?.join(', ') || 'Tất cả'}\n⏱️ Thời gian làm bài: ${exam.duration} phút\n\n👉 Các em vào link sau để làm bài nhé:\n🔗 Liên kết: https://thaytrong-3-t.vercel.app/`;
                                 navigator.clipboard.writeText(text);
                                 alert('Đã copy thông báo vào khay nhớ tạm. Dán (Ctrl+V) vào nhóm Facebook để gửi cho học sinh!');
                                 window.open('https://facebook.com/messages', '_blank');
@@ -928,11 +928,11 @@ export default function TeacherDashboard() {
                                 });
                                 
                                 if (uncompleted.length > 0) {
-                                  const text = `🚨 NHẮC NHỞ LÀM BÀI TẬP 🚨\n\nChào ${student.name}, hệ thống ghi nhận em còn các bài tập sau chưa hoàn thành (hoặc giáo viên chưa đồng bộ điểm):\n${uncompleted.map(e => '📌 ' + e.title).join('\n')}\n\n👉 Em vui lòng đăng nhập vào hệ thống để kiểm tra và làm bài nhé!\n🔗 Link: https://thay-trong.vercel.app`;
+                                  const text = `🚨 NHẮC NHỞ LÀM BÀI TẬP 🚨\n\nChào ${student.name}, hệ thống ghi nhận em còn các bài tập sau chưa hoàn thành (hoặc giáo viên chưa đồng bộ điểm):\n${uncompleted.map(e => '📌 ' + e.title).join('\n')}\n\n👉 Em vui lòng đăng nhập vào hệ thống để kiểm tra và làm bài nhé!\n🔗 Link: https://thaytrong-3-t.vercel.app/`;
                                   navigator.clipboard.writeText(text);
                                   alert(`Đã copy tự động tin nhắn nhắc ${uncompleted.length} bài tập chưa làm. Bạn có thể dán (Ctrl+V) trực tiếp vào Zalo của học sinh!`);
                                 } else {
-                                  const text = `Chào ${student.name}, em lưu ý thường xuyên kiểm tra bài tập mới trên hệ thống nhé!\n🔗 Link: https://thay-trong.vercel.app`;
+                                  const text = `Chào ${student.name}, em lưu ý thường xuyên kiểm tra bài tập mới trên hệ thống nhé!\n🔗 Link: https://thaytrong-3-t.vercel.app/`;
                                   navigator.clipboard.writeText(text);
                                   alert('Học sinh đã làm hết các bài tập (hoặc đã nộp đầy đủ). Hệ thống đã copy thông báo chung vào khay nhớ tạm!');
                                 }
@@ -964,11 +964,11 @@ export default function TeacherDashboard() {
                                 });
                                 
                                 if (uncompleted.length > 0) {
-                                  const text = `🚨 NHẮC NHỞ LÀM BÀI TẬP 🚨\n\nChào ${student.name}, hệ thống ghi nhận em còn các bài tập sau chưa hoàn thành (hoặc giáo viên chưa đồng bộ điểm):\n${uncompleted.map(e => '📌 ' + e.title).join('\n')}\n\n👉 Em vui lòng đăng nhập vào hệ thống để kiểm tra và làm bài nhé!\n🔗 Link: https://thay-trong.vercel.app`;
+                                  const text = `🚨 NHẮC NHỞ LÀM BÀI TẬP 🚨\n\nChào ${student.name}, hệ thống ghi nhận em còn các bài tập sau chưa hoàn thành (hoặc giáo viên chưa đồng bộ điểm):\n${uncompleted.map(e => '📌 ' + e.title).join('\n')}\n\n👉 Em vui lòng đăng nhập vào hệ thống để kiểm tra và làm bài nhé!\n🔗 Link: https://thaytrong-3-t.vercel.app/`;
                                   navigator.clipboard.writeText(text);
                                   alert(`Đã copy tự động tin nhắn nhắc ${uncompleted.length} bài tập chưa làm. Bạn có thể dán (Ctrl+V) trực tiếp vào Facebook của học sinh!`);
                                 } else {
-                                  const text = `Chào ${student.name}, em lưu ý thường xuyên kiểm tra bài tập mới trên hệ thống nhé!\n🔗 Link: https://thay-trong.vercel.app`;
+                                  const text = `Chào ${student.name}, em lưu ý thường xuyên kiểm tra bài tập mới trên hệ thống nhé!\n🔗 Link: https://thaytrong-3-t.vercel.app/`;
                                   navigator.clipboard.writeText(text);
                                   alert('Học sinh đã làm hết các bài tập (hoặc đã nộp đầy đủ). Hệ thống đã copy thông báo chung vào khay nhớ tạm!');
                                 }
