@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, doc, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, setDoc, updateDoc, getDocs, query, where, deleteField } from 'firebase/firestore';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GoogleGenAI, Type } from '@google/genai';
 import { getAI } from '../services/ai';
@@ -72,7 +72,19 @@ export default function ExamBuilder() {
             setAssignedClasses(data.assignedClasses?.join(', ') || '');
             setStartTime(data.startTime || '');
             setEndTime(data.endTime || '');
-            setQuestions(data.questions || []);
+            
+            // Also fetch questions from examQuestions collection
+            try {
+              const qDocRef = doc(db, 'examQuestions', examId);
+              const qDocSnap = await getDoc(qDocRef);
+              if (qDocSnap.exists() && qDocSnap.data().questions) {
+                setQuestions(qDocSnap.data().questions);
+              } else {
+                setQuestions(data.questions || []); // Fallback for old exams
+              }
+            } catch (e) {
+              setQuestions(data.questions || []);
+            }
           } else {
             setError("Không tìm thấy đề thi.");
           }
@@ -467,11 +479,13 @@ export default function ExamBuilder() {
           duration: Number(duration),
           status,
           assignedClasses: classesArray,
-          questions,
           startTime,
-          endTime
-          // Do not update createdAt or teacherId
+          endTime,
+          questions: deleteField() // Remove questions from exams table
         });
+
+        // Save questions to examQuestions collection
+        await setDoc(doc(db, 'examQuestions', examId), { questions });
 
         // RECALCULATE SUBMISSIONS
         try {
@@ -541,13 +555,16 @@ export default function ExamBuilder() {
           duration: Number(duration),
           status,
           assignedClasses: classesArray,
-          questions,
           startTime,
           endTime,
           createdAt: new Date().toISOString()
         };
-        await addDoc(collection(db, 'exams'), examData);
+        const docRef = await addDoc(collection(db, 'exams'), examData);
+        // Save questions to examQuestions
+        await setDoc(doc(db, 'examQuestions', docRef.id), { questions });
       }
+      
+      import('../lib/cache').then(m => m.invalidateCache('exams_'));
       navigate('/teacher');
     } catch (error) {
       handleFirestoreError(error, examId ? OperationType.UPDATE : OperationType.CREATE, examId ? `exams/${examId}` : 'exams');

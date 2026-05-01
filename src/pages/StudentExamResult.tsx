@@ -20,7 +20,20 @@ export default function StudentExamResult() {
       try {
         const examDoc = await getDoc(doc(db, 'exams', examId));
         if (examDoc.exists()) {
-          setExam({ id: examDoc.id, ...examDoc.data() });
+          const examData = { id: examDoc.id, ...examDoc.data() } as any;
+          let questionsToUse = examData.questions || [];
+          if (!examData.questions || examData.questions.length === 0) {
+            try {
+              const qSnap = await getDoc(doc(db, 'examQuestions', examId));
+              if (qSnap.exists() && qSnap.data().questions) {
+                questionsToUse = qSnap.data().questions;
+              }
+            } catch (e) {
+              console.error("Error fetching exam questions", e);
+            }
+          }
+          examData.questions = questionsToUse;
+          setExam(examData);
         }
 
         const targetStudentId = studentId || appUser.uid;

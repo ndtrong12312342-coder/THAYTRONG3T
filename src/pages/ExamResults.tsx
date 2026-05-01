@@ -8,6 +8,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import MathText from '../components/MathText';
 import { GoogleGenAI, Type } from '@google/genai';
 import { getAI } from '../services/ai';
+import { getCachedData } from '../lib/cache';
+import { getStudentsSummary } from '../lib/studentUtils';
 
 export default function ExamResults() {
   const { examId } = useParams<{ examId: string }>();
@@ -54,6 +56,19 @@ export default function ExamResults() {
       let examData: any = null;
       if (docSnap.exists()) {
         examData = { id: docSnap.id, ...docSnap.data() };
+        
+        let questionsToUse = examData.questions || [];
+        if (!examData.questions || examData.questions.length === 0) {
+          try {
+            const qSnap = await getDoc(doc(db, 'examQuestions', examId));
+            if (qSnap.exists() && qSnap.data().questions) {
+              questionsToUse = qSnap.data().questions;
+            }
+          } catch (e) {
+            console.error("Error fetching exam questions", e);
+          }
+        }
+        examData.questions = questionsToUse;
         setExam(examData);
       }
 
@@ -72,9 +87,9 @@ export default function ExamResults() {
         setSubmissions([]);
       }
 
-      const qStudents = query(collection(db, 'users'), where('role', '==', 'student'));
-      const studentSnap = await getDocs(qStudents);
-      const studs = studentSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const studs = await getCachedData('students', async () => {
+        return await getStudentsSummary();
+      }, 300000);
       setStudents(studs);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, 'exam_results_data');

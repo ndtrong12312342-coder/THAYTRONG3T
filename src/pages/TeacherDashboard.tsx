@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, setDoc, deleteDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateEmail, updatePassword, deleteUser } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Link } from 'react-router-dom';
 import { Plus, Users, FileText, LogOut, Edit, Trash2, Upload, X, AlertTriangle, Clock, MessageCircle, RefreshCw, AlertCircle, CheckCircle, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getCachedData, invalidateCache } from '../lib/cache';
+import { getStudentsSummary, syncStudentsSummary } from '../lib/studentUtils';
 
 // Secondary app for creating users without logging out the main user
 const secondaryApp = getApps().find(app => app.name === 'Secondary') || initializeApp(firebaseConfig, 'Secondary');
@@ -49,34 +51,35 @@ export default function TeacherDashboard() {
     setIsRefreshing(true);
     setError(null);
     try {
-      const qExams = query(collection(db, 'exams'), where('teacherId', '==', appUser.uid));
-      const examSnap = await getDocs(qExams);
-      const examsList = examSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const examsList = await getCachedData(`exams_${appUser.uid}`, async () => {
+        const qExams = query(collection(db, 'exams'), where('teacherId', '==', appUser.uid));
+        const snap = await getDocs(qExams);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }, 120000);
       
-      // Sort exams by number in title
       examsList.sort((a: any, b: any) => {
-        const titleA = a.title || '';
-        const titleB = b.title || '';
-        
-        const matchA = titleA.match(/\d+/);
-        const matchB = titleB.match(/\d+/);
-        
-        if (matchA && matchB) {
-          const numA = parseInt(matchA[0], 10);
-          const numB = parseInt(matchB[0], 10);
-          if (numA !== numB) {
-            return numA - numB;
-          }
-        }
-        
-        return titleA.localeCompare(titleB);
-      });
-      
-      setExams(examsList);
+                const titleA = a.title || '';
+                const titleB = b.title || '';
+                
+                const matchA = titleA.match(/\d+/);
+                const matchB = titleB.match(/\d+/);
+                
+                if (matchA && matchB) {
+                  const numA = parseInt(matchA[0], 10);
+                  const numB = parseInt(matchB[0], 10);
+                  if (numA !== numB) {
+                    return numA - numB;
+                  }
+                }
+                
+                return titleA.localeCompare(titleB);
+              });
+              
+              setExams(examsList);
 
-      const qStudents = query(collection(db, 'users'), where('role', '==', 'student'));
-      const studentSnap = await getDocs(qStudents);
-      const studentsList = studentSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const studentsList = await getCachedData('students', async () => {
+        return await getStudentsSummary();
+      }, 300000);
       // Sort students by class name, then by first name (tên)
       studentsList.sort((a: any, b: any) => {
         const classA = a.className || '';
@@ -118,9 +121,44 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleRefresh = async () => {
+    if (appUser) {
+      invalidateCache(`exams_${appUser.uid}`);
+      invalidateCache('students');
+      await fetchData();
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [appUser?.uid]);
+
+  const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const handleOptimizeDatabase = async () => {
+    if (!window.confirm("Thao tác này sẽ dọn dẹp các trường dữ liệu lớn (như câu hỏi) khỏi danh sách đề thi chính để tiết kiệm Băng thông (Quota) Firebase.\nBạn có muốn tiếp tục?")) return;
+    setIsOptimizing(true);
+    try {
+      let migratedCount = 0;
+      for (const exam of exams) {
+        if (exam.questions && exam.questions.length > 0) {
+          // Backup questions to examQuestions
+          await setDoc(doc(db, 'examQuestions', exam.id), { questions: exam.questions });
+          // Remove from exams
+          await updateDoc(doc(db, 'exams', exam.id), { questions: deleteField() });
+          migratedCount++;
+        }
+      }
+      alert(`Đã tối ưu hóa thành công ${migratedCount} đề thi! Hệ thống của bạn hiện sẽ chạy nhẹ nhàng hơn.`);
+      invalidateCache(`exams_${appUser?.uid}`);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Lỗi khi tối ưu hóa: " + err.message);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +177,9 @@ export default function TeacherDashboard() {
       });
       await signOut(secondaryAuth);
       setNewStudent({ name: '', email: '', password: '', className: '', facebook: '' });
+      await syncStudentsSummary();
+      invalidateCache('students');
+      fetchData();
       alert('Tạo học sinh thành công!');
     } catch (error: any) {
       console.error("Error creating student:", error);
@@ -157,6 +198,7 @@ export default function TeacherDashboard() {
           });
           await signOut(secondaryAuth);
           setNewStudent({ name: '', email: '', password: '', className: '', facebook: '' });
+          await syncStudentsSummary();
           alert('Tài khoản đã tồn tại. Dữ liệu đã được đồng bộ thành công!');
         } catch (signInError: any) {
           if (signInError.code === 'auth/wrong-password' || signInError.code === 'auth/invalid-credential') {
@@ -300,6 +342,11 @@ export default function TeacherDashboard() {
             }
           }
           alert(msg);
+          if (successCount > 0) {
+            await syncStudentsSummary();
+            invalidateCache('students');
+            fetchData();
+          }
         }
       } catch (err: any) {
         setStudentError('Lỗi đọc file Excel: ' + err.message);
@@ -419,6 +466,9 @@ export default function TeacherDashboard() {
         password: editStudentData.password
       });
       setEditingStudent(null);
+      await syncStudentsSummary();
+      invalidateCache('students');
+      fetchData();
     } catch (error: any) {
       console.error("Firestore update error:", error);
       setUpdateStudentError("Lỗi cập nhật dữ liệu: " + (error.message || "Không xác định"));
@@ -436,6 +486,8 @@ export default function TeacherDashboard() {
         phone: editFbData.phone
       });
       setEditingFbStudent(null);
+      await syncStudentsSummary();
+      invalidateCache('students');
       fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${editingFbStudent.id}`);
@@ -465,6 +517,9 @@ export default function TeacherDashboard() {
 
       await deleteDoc(doc(db, 'users', studentToDelete));
       setStudentToDelete(null);
+      await syncStudentsSummary();
+      invalidateCache('students');
+      fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${studentToDelete}`);
     } finally {
@@ -478,6 +533,9 @@ export default function TeacherDashboard() {
       const deletePromises = students.map(student => deleteDoc(doc(db, 'users', student.id)));
       await Promise.all(deletePromises);
       setIsDeletingAll(false);
+      await syncStudentsSummary();
+      invalidateCache('students');
+      fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users`);
     }
@@ -487,7 +545,10 @@ export default function TeacherDashboard() {
     if (!examToDelete) return;
     try {
       await deleteDoc(doc(db, 'exams', examToDelete));
+      await deleteDoc(doc(db, 'examQuestions', examToDelete)).catch(() => {});
       setExamToDelete(null);
+      invalidateCache('exams_');
+      fetchData();
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `exams/${examToDelete}`);
     }
@@ -565,7 +626,7 @@ export default function TeacherDashboard() {
               <h1 className="text-xl font-bold text-white tracking-wide">Giáo viên: {appUser?.name}</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button onClick={fetchData} disabled={isRefreshing} className="text-indigo-100 hover:text-white flex items-center transition-colors font-medium mr-2">
+              <button onClick={handleRefresh} disabled={isRefreshing} className="text-indigo-100 hover:text-white flex items-center transition-colors font-medium mr-2">
                 <RefreshCw className={`w-5 h-5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} /> Làm mới
               </button>
               <button onClick={logout} className="text-indigo-100 hover:text-white flex items-center transition-colors font-medium">
@@ -608,9 +669,20 @@ export default function TeacherDashboard() {
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Danh sách Đề thi</h2>
-              <Link to="/teacher/exam/new" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-full font-medium flex items-center hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                <Plus className="w-5 h-5 mr-1" /> Tạo đề thi mới
-              </Link>
+              <div className="flex space-x-3">
+                <button 
+                  onClick={handleOptimizeDatabase} 
+                  disabled={isOptimizing}
+                  className="bg-emerald-100 text-emerald-700 px-4 py-2.5 rounded-full font-medium flex items-center hover:bg-emerald-200 transition-all shadow-sm"
+                  title="Tách câu hỏi ra khỏi danh sách để tải nhanh hơn"
+                >
+                  <FileText className="w-4 h-4 mr-1.5" /> 
+                  {isOptimizing ? 'Đang dọn dẹp...' : 'Tối ưu dung lượng'}
+                </button>
+                <Link to="/teacher/exam/new" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-2.5 rounded-full font-medium flex items-center hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                  <Plus className="w-5 h-5 mr-1" /> Tạo đề thi mới
+                </Link>
+              </div>
             </div>
             <div className="bg-white shadow-md overflow-hidden sm:rounded-2xl border border-gray-100">
               <ul className="divide-y divide-gray-100">

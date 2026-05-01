@@ -45,7 +45,19 @@ export default function TakeExam() {
             return;
           }
 
-          setExam({ id: docSnap.id, ...data });
+          let questionsToUse = data.questions || [];
+          if (!data.questions || data.questions.length === 0) {
+            try {
+              const qSnap = await getDoc(doc(db, 'examQuestions', examId));
+              if (qSnap.exists() && qSnap.data().questions) {
+                questionsToUse = qSnap.data().questions;
+              }
+            } catch (e) {
+              console.error("Error fetching exam questions", e);
+            }
+          }
+
+          setExam({ id: docSnap.id, ...data, questions: questionsToUse });
           setTimeLeft(data.duration * 60); // convert to seconds
         } else {
           setError('Không tìm thấy đề thi.');
@@ -255,6 +267,7 @@ export default function TakeExam() {
           submittedAt: submissionData.submittedAt
         })
       });
+      import('../lib/cache').then(m => m.invalidateCache('exams_'));
 
       setSubmittedResult({ score: finalScore, incorrectQuestions });
     } catch (err: any) {
